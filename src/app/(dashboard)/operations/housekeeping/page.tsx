@@ -1,22 +1,45 @@
+import { redirect } from "next/navigation";
+import { createServerClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/layout/TopBar";
-import { Wrench } from "lucide-react";
+import { HousekeepingBoard } from "@/components/operations/HousekeepingBoard";
 
-export default function HousekeepingPage() {
+export const dynamic = "force-dynamic";
+
+export default async function HousekeepingPage() {
+  const supabase = await createServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("organization_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile?.organization_id) redirect("/onboarding");
+  const orgId = profile.organization_id;
+
+  const [{ data: tasks }, { data: rooms }] = await Promise.all([
+    supabase
+      .from("housekeeping_tasks")
+      .select("*, room:rooms(id, name, room_number, type)")
+      .eq("organization_id", orgId)
+      .order("created_at", { ascending: false })
+      .limit(100),
+    supabase
+      .from("rooms")
+      .select("id, name, room_number, type")
+      .eq("organization_id", orgId)
+      .eq("is_active", true)
+      .order("sort_order"),
+  ]);
+
   return (
     <>
-      <TopBar title="Opérations" />
+      <TopBar title="Ménage & Opérations" />
       <main className="p-4 lg:p-6">
-        <div className="max-w-lg mx-auto mt-16 text-center">
-          <div className="w-20 h-20 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <Wrench size={36} className="text-amber-400" />
-          </div>
-          <h2 className="text-xl font-heading font-semibold text-stone-800 mb-2">
-            Module Opérations
-          </h2>
-          <p className="text-sm text-stone-400 max-w-sm mx-auto">
-            Tâches de ménage, maintenance et gestion des stocks — disponible dans la prochaine version.
-          </p>
-        </div>
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        <HousekeepingBoard tasks={(tasks || []) as any[]} rooms={(rooms || []) as any[]} />
       </main>
     </>
   );

@@ -13,9 +13,11 @@ import {
   LogOut,
   XCircle,
   Loader2,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { updateReservationStatus, cancelReservation } from "@/lib/actions/reservations";
+import { AddPaymentDialog } from "@/components/finances/AddPaymentDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -56,6 +58,7 @@ export function ReservationDetail({ reservation: r }: ReservationDetailProps) {
   const [loading, setLoading] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
 
   const status = r.status || "confirmed";
   const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.confirmed;
@@ -267,9 +270,16 @@ export function ReservationDetail({ reservation: r }: ReservationDetailProps) {
 
       {/* Financial */}
       <div className="hp-card p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <CreditCard size={16} className="text-teal-600" />
-          <h2 className="font-heading font-semibold text-stone-900">Paiement</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <CreditCard size={16} className="text-teal-600" />
+            <h2 className="font-heading font-semibold text-stone-900">Paiement</h2>
+          </div>
+          {(status === "confirmed" || status === "checked_in" || status === "checked_out") && (
+            <Button size="sm" variant="outline" onClick={() => setShowPaymentDialog(true)}>
+              <Plus size={14} className="mr-1" /> Paiement
+            </Button>
+          )}
         </div>
 
         <div className="space-y-3">
@@ -343,6 +353,16 @@ export function ReservationDetail({ reservation: r }: ReservationDetailProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Add payment dialog */}
+      <AddPaymentDialog
+        open={showPaymentDialog}
+        onClose={() => {
+          setShowPaymentDialog(false);
+          router.refresh();
+        }}
+        prefilledReservationId={r.id}
+      />
     </div>
   );
 }
