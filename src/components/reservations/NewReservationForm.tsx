@@ -316,7 +316,10 @@ export function NewReservationForm({ guests: initialGuests, rooms }: NewReservat
 
       <GuestFormDialog
         open={showAddGuest}
-        onClose={() => setShowAddGuest(false)}
+        onClose={() => {
+          setShowAddGuest(false);
+          router.refresh(); // Reload page so the new guest appears in the dropdown
+        }}
       />
     </div>
   );

@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { createRoom } from "@/lib/actions/rooms";
+import { createRoom, updateRoom } from "@/lib/actions/rooms";
 import { ROOM_AMENITIES } from "@/lib/constants/room-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,13 +42,28 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+type EditRoomData = {
+  id: string;
+  name?: string | null;
+  room_number?: string | null;
+  type?: FormValues["type"] | null;
+  base_price?: number | null;
+  max_occupancy?: number | null;
+  bed_count?: number | null;
+  description?: string | null;
+  floor_id?: string | null;
+  amenities?: string[] | null;
+};
+
 type RoomFormDialogProps = {
   open: boolean;
   onClose: () => void;
   floors: Partial<Floor>[];
+  editRoom?: EditRoomData;
 };
 
-export function RoomFormDialog({ open, onClose, floors }: RoomFormDialogProps) {
+export function RoomFormDialog({ open, onClose, floors, editRoom }: RoomFormDialogProps) {
+  const isEditing = !!editRoom?.id;
   const {
     register,
     handleSubmit,
@@ -58,12 +73,24 @@ export function RoomFormDialog({ open, onClose, floors }: RoomFormDialogProps) {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: {
-      type: "private_double",
-      max_occupancy: 2,
-      bed_count: 1,
-      amenities: [],
-    },
+    defaultValues: editRoom
+      ? {
+          name: editRoom.name || "",
+          room_number: editRoom.room_number || "",
+          type: editRoom.type || "private_double",
+          base_price: editRoom.base_price || 0,
+          max_occupancy: editRoom.max_occupancy || 2,
+          bed_count: editRoom.bed_count || 1,
+          description: editRoom.description || "",
+          floor_id: editRoom.floor_id || null,
+          amenities: editRoom.amenities || [],
+        }
+      : {
+          type: "private_double",
+          max_occupancy: 2,
+          bed_count: 1,
+          amenities: [],
+        },
   });
 
   const amenities = watch("amenities");
@@ -80,8 +107,13 @@ export function RoomFormDialog({ open, onClose, floors }: RoomFormDialogProps) {
 
   async function onSubmit(values: FormValues) {
     try {
-      await createRoom(values);
-      toast.success("Chambre créée avec succès");
+      if (isEditing && editRoom?.id) {
+        await updateRoom(editRoom.id, values);
+        toast.success("Chambre mise à jour");
+      } else {
+        await createRoom(values);
+        toast.success("Chambre créée avec succès");
+      }
       reset();
       onClose();
     } catch (err) {
@@ -93,7 +125,7 @@ export function RoomFormDialog({ open, onClose, floors }: RoomFormDialogProps) {
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-heading">Nouvelle chambre</DialogTitle>
+          <DialogTitle className="font-heading">{isEditing ? "Modifier la chambre" : "Nouvelle chambre"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-2">
@@ -193,7 +225,7 @@ export function RoomFormDialog({ open, onClose, floors }: RoomFormDialogProps) {
               disabled={isSubmitting}
             >
               {isSubmitting ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
-              Créer la chambre
+              {isEditing ? "Mettre à jour" : "Créer la chambre"}
             </Button>
           </div>
         </form>

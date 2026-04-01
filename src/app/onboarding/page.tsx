@@ -13,7 +13,7 @@ import {
   ArrowRight,
   Loader2,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { createOrganizationAndProfile } from "@/lib/actions/onboarding";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,14 +36,6 @@ const onboardingSchema = z.object({
 
 type OnboardingValues = z.infer<typeof onboardingSchema>;
 
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -68,67 +60,17 @@ export default function OnboardingPage() {
 
   async function onSubmit(values: OnboardingValues) {
     setServerError(null);
-    const supabase = createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      router.push("/login");
-      return;
+    try {
+      await createOrganizationAndProfile(values);
+      setStep(3);
+      setTimeout(() => {
+        router.push("/dashboard");
+        router.refresh();
+      }, 1500);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erreur lors de la création";
+      setServerError(message);
     }
-
-    // Generate a unique slug
-    const baseSlug = slugify(values.name);
-    const slug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
-
-    // Create organization
-    const { data: org, error: orgError } = await supabase
-      .from("organizations")
-      .insert({
-        name: values.name,
-        slug,
-        city: values.city,
-        address: values.address || null,
-        phone: values.phone || null,
-        email: values.email || null,
-        currency: "MAD",
-        timezone: "Africa/Casablanca",
-        tax_sejour_rate: 0,
-        subscription_tier: "free",
-        settings: {
-          check_in_time: values.check_in_time,
-          check_out_time: values.check_out_time,
-        },
-      })
-      .select()
-      .single();
-
-    if (orgError || !org) {
-      setServerError(`Erreur: ${orgError?.message || "Organisation non créée"}`);
-      return;
-    }
-
-    // Create profile
-    const { error: profileError } = await supabase.from("profiles").upsert({
-      id: user.id,
-      full_name: user.user_metadata.full_name || user.email || "Propriétaire",
-      organization_id: org.id,
-      role: "owner",
-      is_active: true,
-    });
-
-    if (profileError) {
-      setServerError(`Erreur profil: ${profileError.message}`);
-      return;
-    }
-
-    setStep(3);
-    setTimeout(() => {
-      router.push("/dashboard");
-      router.refresh();
-    }, 1500);
   }
 
   if (step === 3) {
